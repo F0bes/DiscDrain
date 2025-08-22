@@ -1,0 +1,126 @@
+name: Build & Release DiscDrain
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  cut_release:
+    name: "Create Tag"
+    runs-on: ubuntu-latest
+    outputs:
+      new_tag: ${{ steps.tag_version.outputs.new_tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bump Version & Push Tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ github.token }}
+          tag_prefix: v
+          default_bump: patch
+
+  build_macos:
+    needs: cut_release
+    runs-on: macos-15
+    env:
+      SIGN_KEY: ${{ secrets.APPLE_SIGN_P12_B64 }}
+      SIGN_PASS: ${{ secrets.APPLE_SIGN_P12_PASS }}
+      NOTARIZE_KEY: ${{ secrets.APPLE_APPSTORECONNECT_CFG }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Xcode 16.4
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app
+
+      - name: Generate Version Header
+        run: |
+          echo "#define APP_VERSION \"${{ needs.cut_release.outputs.new_tag }}\"" > DiscDrain/Version.h
+
+      - name: Inject Version into Info.plist
+        run: |
+          VERSION="${{ needs.cut_release.outputs.new_tag }}"
+          echo "Injecting version $VERSION into Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "DiscDrain/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "DiscDrain/Info.plist"
+
+      - name: Build DiscDrain
+        run: |
+          TAR_DIR="DiscDrain-${{ needs.cut_release.outputs.new_tag }}"
+          mkdir -p "$TAR_DIR"
+          xattr -w com.apple.xcode.CreatedByBuildSystem true "$TAR_DIR"
+          xcodebuild clean build \
+            -project DiscDrain.xcodeproj \
+            -scheme DiscDrain \
+            -configuration Release \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CONFIGURATION_BUILD_DIR="$PWD/$TAR_DIR"
+          echo "Built app bundle:"
+          ls -R "$TAR_DIR/DiscDrain.app/Contents"
+
+      - name: Pull the Signing Keys and Notarization Credentials
+        run: |
+          echo "${{ secrets.APPLE_SIGN_P12_B64 }}" | base64 -d > cert.p12
+          echo "${{ secrets.APPLE_APPSTORECONNECT_CFG }}" | base64 -d > key.json
+
+      - name: Sign the Application
+        uses: indygreg/apple-code-sign-action@44d0985b7f4363198e80b6fea63ac3e9dd3e9957
+        with:
+          input_path: 'DiscDrain-${{ needs.cut_release.outputs.new_tag }}/DiscDrain.app'
+          p12_file: cert.p12
+          p12_password: "${{ secrets.APPLE_SIGN_P12_PASS }}"
+          sign_args: |
+            --for-notarization
+            --code-signature-flags=runtime
+            --entitlements-xml-file=DiscDrain/DiscDrain.entitlements
+          notarize: true
+          staple: true
+          # Generated using rcodesign encode-app-store-connect-api-key
+          # Despite what the docs say, I found that this file is required and I had 0 luck
+          # passing the issuer id, key, etc through arguments.
+          app_store_connect_api_key_json_file: 'key.json'
+
+      - name: Verify Signature
+        run: |
+          codesign --verify --deep --strict --verbose=2 "DiscDrain-${{ needs.cut_release.outputs.new_tag }}/DiscDrain.app"
+          spctl --assess --verbose=4 --type execute "DiscDrain-${{ needs.cut_release.outputs.new_tag }}/DiscDrain.app"
+
+
+      - name: Package Artifact
+        run: |
+          TAR_DIR="DiscDrain-${{ needs.cut_release.outputs.new_tag }}"
+          TAR_FILE="$TAR_DIR-macos.tar.xz"
+          tar -cJf "$TAR_FILE" -C "$TAR_DIR" "DiscDrain.app"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DiscDrain-${{ needs.cut_release.outputs.new_tag }}
+          path: DiscDrain-${{ needs.cut_release.outputs.new_tag }}-macos.tar.xz
+
+  publish_release:
+    needs: [cut_release, build_macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download macOS Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: DiscDrain-${{ needs.cut_release.outputs.new_tag }}
+          path: ./artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.cut_release.outputs.new_tag }}
+          prerelease: true
+          generate_release_notes: true
+          files: ./artifacts/DiscDrain-${{ needs.cut_release.outputs.new_tag }}-macos.tar.xz
