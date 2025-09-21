@@ -292,7 +292,25 @@ BOOL writeCUEFile(NSString *cuePath, NSString *isoFileName, int inFd, NSError **
 		(void)fcntl(inFd, F_NOCACHE, 1);
 		(void)fcntl(outFd, F_NOCACHE, 1);
 
-		unsigned long long totalSize = GetDiscSize(disc.bsdPath ?: disc.rbsdPath);
+		unsigned long long totalSize = 0;
+		for(int attempt = 1; attempt <= 5; attempt++)
+		{
+			totalSize = GetDiscSize(disc.bsdPath ?: disc.rbsdPath);
+			if(totalSize > 0)
+				break;
+			usleep(200000);
+		}
+
+		if(totalSize == 0)
+		{
+			close(inFd); close(outFd);
+			dispatch_async(dispatch_get_main_queue(), ^{
+				completionBlock([NSError errorWithDomain:@"DiscDrain" code:3
+												userInfo:@{NSLocalizedDescriptionKey : @"Failed to get disc size (reported 0 bytes after 5 attempts)"}]);
+			});
+			return;
+		}
+
 		void *buffer = malloc(4 * 1024 * 1024); // 4 MiB
 		if (!buffer) {
 			close(inFd); close(outFd);
