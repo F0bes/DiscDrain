@@ -247,19 +247,6 @@
 
 	DiscInstance* disc = self.cdDrives[selectedIndex];
 
-	if(disc.type == DiscTypeCD)
-	{
-		NSAlert* alert = [[NSAlert alloc] init];
-		alert.messageText = @"This ain't a DVD!";
-		alert.informativeText = @"DiscDrain probably doesn't work with CDs, expect a bad bin if you proceed";
-		[alert addButtonWithTitle:@"Proceed"];
-		[alert addButtonWithTitle:@"Cancel"];
-		alert.alertStyle = NSAlertStyleWarning;
-		
-		if ([alert runModal] != NSAlertFirstButtonReturn)
-			return;
-	}
-	
 	// Unmount if mounted
 	if ([IOKitManager isDiskMountedAtBSDPath:disc.bsdPath])
 	{
