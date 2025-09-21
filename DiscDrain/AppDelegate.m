@@ -259,17 +259,20 @@
 		cuePath = [[binPath stringByDeletingPathExtension] stringByAppendingPathExtension:@"cue"];
 	}
 
-	self.progressBar.doubleValue = 0.0;
-	self.progressBar.hidden = NO;
-	self.statusLabel.stringValue = @"Ripping";
-	self.refreshButton.enabled = NO;
-	self.ejectButton.enabled = NO;
-	self.loadNameFromDiscButton.enabled = NO;
-	self.browseOutputButton.enabled = NO;
-	self.openOutputButton.enabled = NO;
-	self.md5Checkbox.enabled = NO;
-	self.sha256Checkbox.enabled = NO;
-	self.ripButton.title = @"Cancel";
+	[self.progressBar setDoubleValue:0.0];
+	[self.progressBar setHidden:NO];
+	[self.statusLabel setStringValue:@"Ripping"];
+	[self.refreshButton setEnabled:NO];
+	[self.ejectButton setEnabled:NO];
+	[self.loadNameFromDiscButton setEnabled:NO];
+	[self.browseOutputButton setEnabled:NO];
+	[self.openOutputButton setEnabled:NO];
+	[self.md5Checkbox setEnabled:NO];
+	[self.sha256Checkbox setEnabled:NO];
+	[self.outputTextField setEnabled:NO];
+	[self.outputPathTextField setEnabled:NO];
+	[self.drivePopup setEnabled:NO];
+	[self.ripButton setTitle:@"Cancel"];
 	self.rippingInProgress = YES;
 	self.shouldCancelRip = NO;
 
@@ -293,16 +296,20 @@
 				else
 				{
 					self.statusLabel.stringValue = @"Rip complete!";
+					[self.statusLabel setStringValue:@"Rip complete!"];
 					[self handleChecksumsIfNeeded:binPath];
 				}
-				self.refreshButton.enabled = YES;
-				self.ejectButton.enabled = YES;
-				self.loadNameFromDiscButton.enabled = YES;
-				self.browseOutputButton.enabled = YES;
-				self.openOutputButton.enabled = YES;
-				self.md5Checkbox.enabled = YES;
-				self.sha256Checkbox.enabled = YES;
-				self.ripButton.title = @"Rip";
+				[self.refreshButton setEnabled:YES];
+				[self.ejectButton setEnabled:YES];
+				[self.loadNameFromDiscButton setEnabled:YES];
+				[self.browseOutputButton setEnabled:YES];
+				[self.openOutputButton setEnabled:YES];
+				[self.md5Checkbox setEnabled:YES];
+				[self.sha256Checkbox setEnabled:YES];
+				[self.outputTextField setEnabled:YES];
+				[self.outputPathTextField setEnabled:YES];
+				[self.drivePopup setEnabled:YES];
+				[self.ripButton setTitle:@"Rip"];
 				self.rippingInProgress = NO;
 			});
 		}];
