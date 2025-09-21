@@ -9,7 +9,7 @@
 #import "DiskMonitor.h"
 #import "IOKitManager.h"
 
-@interface AppDelegate () <DiskMonitorDelegate>
+@interface AppDelegate () <DiskMonitorDelegate, NSTextFieldDelegate>
 
 @property(strong) IBOutlet NSWindow* window;
 @property(nonatomic, strong) NSArray<DiscInstance*>* cdDrives;
@@ -27,6 +27,9 @@
 
 	self.diskMonitor = [[DiskMonitor alloc] init];
 	self.diskMonitor.delegate = self;
+	self.outputTextField.delegate = self;
+	self.outputPathTextField.delegate = self;
+	[self checkOutputValuesValid];
 	[self.diskMonitor startMonitoring];
 
     NSString *version = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
@@ -47,7 +50,36 @@
 	return YES;
 }
 
-#pragma mark - DiskMonitorDelegate
+// should've done maui or even QT
+- (BOOL)isStringEmpty:(NSString *)string {
+	if (string == nil || [string isKindOfClass:[NSNull class]]) {
+		return YES;
+	}
+	if ([string length] == 0) {
+		return YES;
+	}
+	if (![[string stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]] length]) {
+		return YES;
+	}
+	return NO;
+}
+
+- (void)checkOutputValuesValid{
+	if([self isStringEmpty:self.outputTextField.stringValue] || [self isStringEmpty:self.outputPathTextField.stringValue])
+	{
+		[self.ripButton setEnabled:NO];
+	}
+	else
+	{
+		[self.ripButton setEnabled:YES];
+	}
+}
+
+- (void)controlTextDidChange:(NSNotification *)notification {
+		if ([notification object] == self.outputTextField || [notification object] == self.outputPathTextField) {
+			[self checkOutputValuesValid];
+		}
+	}
 
 - (void)diskDidAppear:(DiscInstance*)disc
 {
@@ -154,6 +186,7 @@
 	}
 
 	self.outputTextField.stringValue = [discName stringByAppendingString:discExtension];
+	[self checkOutputValuesValid];
 }
 
 - (IBAction)browseOutput:(id)sender
@@ -167,6 +200,7 @@
 	{
 		self.outputPath = openPanel.URL;
 		self.outputPathTextField.stringValue = self.outputPath.path;
+		[self checkOutputValuesValid];
 	}
 }
 
